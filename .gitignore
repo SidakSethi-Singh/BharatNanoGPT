@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Secrets — never commit a real .env
+.env
+
+# Generated data / models (reproducible via data/prepare.py + train.py)
+data/train.bin
+data/val.bin
+data/corpus.txt
+tokenizer/tokenizer.json
+out/
+results/
+assets/loss_curve.png
+
+# OS / editor
+.DS_Store
+.vscode/

@@ -1,0 +1,13 @@
+# BharatNanoGPT — pinned where sensible (Sid's LawSathi style).
+# Python 3.11+ (tested here on 3.12; 3.11 is the target).
+# Install CPU-only torch first (the PyPI wheel is ~900 MB with CUDA; the
+# CPU wheel is ~190 MB and is all this project needs on CPU):
+#   pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+# For a GPU (Colab T4) use the CUDA wheel from https://pytorch.org instead.
+torch==2.5.1
+tokenizers==0.20.3
+numpy==2.2.1
+matplotlib==3.9.2
+streamlit==1.41.1
+pytest==8.3.4
