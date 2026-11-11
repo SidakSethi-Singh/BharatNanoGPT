@@ -93,6 +93,14 @@ def main():
     train_data = np.memmap(os.path.join(cfg["data_dir"], "train.bin"), dtype=np.uint16, mode="r")
     val_data = np.memmap(os.path.join(cfg["data_dir"], "val.bin"), dtype=np.uint16, mode="r")
     print(f"Data: train={len(train_data):,} tokens, val={len(val_data):,} tokens")
+    if len(val_data) <= cfg["block_size"] or len(train_data) <= cfg["block_size"]:
+        print(f"ERROR: corpus too small for block_size={cfg['block_size']} "
+              f"(val has only {len(val_data):,} tokens). This happens when "
+              "Wikipedia returned HTTP 429 and prepare fell back to the "
+              "313-line local corpus. Do NOT train on this. Fix: re-run "
+              "prepare with --from-text <prebuilt corpus.txt> (see COLAB.md), "
+              "or wait and retry the Wikipedia download.")
+        sys.exit(2)
 
     # Tokenizer vocab must match the config's vocab_size.
     tok_path = "tokenizer/tokenizer.json"

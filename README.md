@@ -72,19 +72,43 @@ val bottoms out at iter 600 and then rises.
 their val loss is worse. `python evaluate.py` on it: **val loss 4.45,
 perplexity 85.3** (random-batch variation across eval runs: 4.38–4.45).
 
-**Full 15M run (Colab T4) — not yet run.** On a free Colab T4:
+**Full 14M run (Colab T4) — RAN 8 Nov 2026, but overfitted; checkpoints lost.**
+On 8 Nov the full run (`config/train_bharat.py`, 6000 iters, ~53 min on a
+free T4) reached iter 5999 and printed `Done`:
 
-```bash
-# upload this repo, then:
-python -m data.prepare
-python train.py --config config/train_bharat.py   # ~14M params, 6000 iters, out/bharat/
-```
+- Train loss 7.67 → **0.0236** (the model memorised the corpus)
+- Val loss 7.68 → **9.88**, perplexity **20,876**; best val loss **6.57**
+  (early in the run) — worse than the tiny model's best val loss 4.38 /
+  perplexity 85.3
+- Samples mixed memorised Wikipedia fragments into the Hindi prompt
+  instead of generating coherent Hindi (e.g. `राम सुबह उठकर स्कूल गया।`
+  followed by an English music-dictionary fragment)
 
-Do not claim the full model is trained until that run exists. The 4–5 hour
-hackathon window on 14 Nov is **not** enough to train from scratch on the
-day — the honest split is: pre-train before 14 Nov, demo loads the
-checkpoint instantly, training code is there for judges to re-run. See
-`docs/INFRASHIFT.md`.
+The 120,280-token corpus is too small for a ~14M model, and 6000 iters
+was too many. **The 14 checkpoints (742 MB) were then LOST**: after a
+disconnect, Reconnect gave a new Colab runtime with an empty `/content`
+— the files only ever lived on that temporary machine. Nothing was
+downloaded in time. The numbers above survive from screenshots, so they
+are reported honestly here; the checkpoints themselves are gone.
+
+**Retrain (Colab T4) — RAN 11 Nov 2026, 1000 iters, ~10.5 min.**
+`config/train_bharat.py --max-iters 1000`, data train=90,802 / val=4,779
+tokens (BPE vocab 8192 tokenisation of the 120,280-token corpus):
+
+- Train loss 9.12 → **0.581**; val loss 9.12 → **6.30** at iter 999
+- **Best val loss 5.6645 at iter 500 (perplexity 288.5)** — the best
+  checkpoint is `out/bharat/ckpt_500.pt`, not the final `ckpt.pt`
+- Much better than the 6000-iter run (best 6.57, final 9.88, ppl 20,876),
+  but still worse than the tiny model (best val 4.38, ppl 85.3), so the
+  demo checkpoint stays the tiny one. Samples are still fragmentary
+  (e.g. `राम सुबह उठकर` → Hindi fragments mixed with English text) —
+  the corpus is still too small for a 14M model to learn coherent Hindi.
+- Checkpoints were copied to Google Drive
+  (`MyDrive/BharatNanoGPT-retrain-1000/`) right after training, so this
+  run cannot be lost the way the 6000-iter run was.
+
+**Demo checkpoint stays `out/tiny/ckpt.pt` (iter 600, val 4.38)** until a
+better full-model checkpoint exists.
 
 ## How to run it
 
@@ -114,7 +138,8 @@ python -m pytest -q
 |---|---|---|---|---|
 | Tiny CPU (~4M, 600 iters) | 7.67 → 3.21 | 7.68 → **4.38** (best, iter 600) | **85.3** | See below — fragmentary, honest |
 | Phase 2 resume (+300 iters) | → 1.83 | **rose to 4.90** (overfit, stopped) | — | Worse val; not used for demo |
-| Full Colab T4 (~14M, 6000 iters) | not run yet | not run yet | — | — |
+| Full Colab T4 (~14M, 6000 iters, 8 Nov) | → **0.0236** | **9.88** (best 6.57, overfit) | **20,876** | Memorised Wikipedia fragments; checkpoints lost on reconnect — see above |
+| Full retrain T4 (~14M, 1000 iters, 11 Nov) | 9.12 → 0.581 | **6.30** (best **5.66** at iter 500) | **288.5** (best) | Still fragmentary; best ckpt is `ckpt_500.pt`, saved to Drive |
 
 Sample outputs from the demo checkpoint (iter 600, temp 0.8, top-k 40 —
 exactly what `python sample.py` prints; read them before judging):
@@ -160,7 +185,9 @@ An earlier AI/ML API (aimlapi.com) integration was added in error and
   limited knowledge, occasional gibberish or repetition. That is the
   honest trade-off of training from scratch on a laptop/Colab budget.
 - The tiny checkpoint is a smoke test to prove the pipeline end to end;
-  the full model is the one to demo if the Colab run completes.
+  the full 14M run (8 Nov) overfitted and its checkpoints were lost, so
+  the tiny checkpoint stays the demo checkpoint until the ~1000-iter
+  retrain (with Drive saving) produces a better val loss.
 - Hindi generation quality depends on the corpus mix; Devanagari + Latin
   share one BPE vocabulary (2048 tiny / 8192 full).
 
