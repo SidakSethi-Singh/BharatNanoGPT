@@ -63,10 +63,20 @@ def clean_text(text):
     return lines
 
 
-def _api(url, timeout=20):
-    req = urllib.request.Request(url, headers={"User-Agent": "BharatNanoGPT/1.0 (hackathon; contact: sid)"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.load(r)
+def _api(url, timeout=20, retries=3):
+    # Wikipedia rate-limits shared Colab IPs with HTTP 429. Retry with
+    # backoff instead of failing every topic at once.
+    import time as _time
+    last = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "BharatNanoGPT/1.0 (hackathon; contact: sid)"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.load(r)
+        except Exception as e:  # noqa: BLE001
+            last = e
+            _time.sleep(2 * (attempt + 1))
+    raise last
 
 
 def wiki_titles(lang, topics, per_topic=4):
@@ -134,6 +144,11 @@ def main():
     ap.add_argument("--corpus-dir", default="data/corpus")
     ap.add_argument("--out-text", default="data/corpus.txt")
     ap.add_argument("--no-download", action="store_true")
+    ap.add_argument("--from-text", default=None,
+                    help="Use this plain-text file as the corpus directly "
+                         "(one line per sample), skipping Wikipedia. Use it "
+                         "when Wikipedia returns HTTP 429, e.g. the prebuilt "
+                         "corpus.txt from the repo's Colab run.")
     ap.add_argument("--hi-articles", type=int, default=120)
     ap.add_argument("--en-articles", type=int, default=120)
     ap.add_argument("--vocab-size", type=int, default=2048)
@@ -146,9 +161,15 @@ def main():
         spec.loader.exec_module(mod)
         args.vocab_size = mod.config.get("tokenizer_vocab_size", args.vocab_size)
 
-    lines = load_local_corpus(args.corpus_dir)
-    wiki_lines = 0
-    if not args.no_download:
+    if args.from_text:
+        with open(args.from_text, encoding="utf-8") as f:
+            lines = clean_text(f.read())
+        wiki_lines = 0
+        print(f"  using prebuilt corpus file {args.from_text}: {len(lines)} lines")
+    else:
+        lines = load_local_corpus(args.corpus_dir)
+        wiki_lines = 0
+    if not args.no_download and not args.from_text:
         try:
             wiki = download_wikipedia(args.hi_articles, args.en_articles)
             wiki_lines = len(wiki)
@@ -190,6 +211,11 @@ def main():
     train_ids.tofile("data/train.bin")
     val_ids.tofile("data/val.bin")
     print(f"Tokens: total={len(ids):,} train={len(train_ids):,} val={len(val_ids):,}")
+    if len(ids) < 20000:
+        print("WARNING: corpus is too small to train properly "
+              f"({len(ids):,} tokens). Wikipedia probably returned HTTP 429. "
+              "Do NOT train the full config on this — re-run prepare with "
+              "--from-text <prebuilt corpus.txt>, or wait and retry Wikipedia.")
     print("Wrote data/train.bin, data/val.bin, data/corpus.txt")
 
 
